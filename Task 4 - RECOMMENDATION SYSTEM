@@ -1,0 +1,75 @@
+import numpy as np
+import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# Sample dataset of movies and user ratings
+movies = pd.DataFrame({
+    'movie_id': [1, 2, 3, 4, 5],
+    'title': ['Movie A', 'Movie B', 'Movie C', 'Movie D', 'Movie E'],
+    'genre': ['Action', 'Comedy', 'Action', 'Romance', 'Comedy'],
+    'director': ['Director X', 'Director Y', 'Director X', 'Director Z', 'Director Y'],
+    'actors': ['Actor 1, Actor 2', 'Actor 3, Actor 4', 'Actor 1, Actor 5', 'Actor 6, Actor 7', 'Actor 3, Actor 8']
+})
+
+# User ratings (Collaborative filtering)
+ratings = pd.DataFrame({
+    'user_id': [1, 1, 2, 2, 3, 3, 4, 4],
+    'movie_id': [1, 2, 2, 3, 1, 4, 3, 5],
+    'rating': [5, 3, 4, 5, 2, 4, 3, 5]
+})
+
+# Collaborative Filtering (User-User Similarity)
+def collaborative_filtering(user_id, ratings, movies, top_n=3):
+    # Create user-item matrix
+    user_movie_matrix = ratings.pivot(index='user_id', columns='movie_id', values='rating').fillna(0)
+    
+    # Compute cosine similarity between users
+    user_similarity = cosine_similarity(user_movie_matrix)
+    user_sim_df = pd.DataFrame(user_similarity, index=user_movie_matrix.index, columns=user_movie_matrix.index)
+    
+    # Find the most similar users
+    similar_users = user_sim_df[user_id].sort_values(ascending=False)[1:].index[:top_n]
+    
+    # Get the movies rated by similar users
+    recommended_movies = ratings[ratings['user_id'].isin(similar_users)]['movie_id'].unique()
+    recommended_movie_titles = movies[movies['movie_id'].isin(recommended_movies)]['title']
+    
+    return recommended_movie_titles.tolist()
+
+# Content-Based Filtering (Movie-Feature Similarity)
+def content_based_filtering(user_id, ratings, movies, top_n=3):
+    # Get the movies rated by the user
+    user_rated_movies = ratings[ratings['user_id'] == user_id]['movie_id']
+    
+    # Merge movie features into a single string
+    movies['features'] = movies[['genre', 'director', 'actors']].apply(lambda x: ' '.join(x), axis=1)
+    
+    # Vectorize the movie features
+    vectorizer = TfidfVectorizer()
+    feature_matrix = vectorizer.fit_transform(movies['features'])
+    
+    # Get the features of movies rated by the user
+    user_movie_ids = user_rated_movies.values
+    user_feature_matrix = feature_matrix[np.isin(movies['movie_id'], user_movie_ids)]
+    
+    # Compute similarity between all movies and user-rated movies
+    movie_similarities = cosine_similarity(user_feature_matrix, feature_matrix)
+    avg_similarities = movie_similarities.mean(axis=0)
+    
+    # Recommend top N most similar movies
+    recommended_movie_indices = avg_similarities.argsort()[-top_n:][::-1]
+    recommended_movie_titles = movies.iloc[recommended_movie_indices]['title'].values
+    
+    return recommended_movie_titles.tolist()
+
+# Example Usage
+user_id = 1
+
+# Collaborative filtering recommendations
+collab_recommendations = collaborative_filtering(user_id, ratings, movies)
+print(f"Collaborative Filtering Recommendations for User {user_id}: {collab_recommendations}")
+
+# Content-based filtering recommendations
+content_recommendations = content_based_filtering(user_id, ratings, movies)
+print(f"Content-Based Filtering Recommendations for User {user_id}: {content_recommendations}")
