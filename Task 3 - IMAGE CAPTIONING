@@ -1,0 +1,112 @@
+pip install tensorflow keras pillow numpy matplotlib
+import tensorflow as tf
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.models import Model
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.layers import Input, Dense, LSTM, Embedding, Dropout
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.preprocessing.text import Tokenizer
+from PIL import Image
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Load a pre-trained ResNet50 model
+image_model = ResNet50(weights='imagenet')
+image_model = Model(image_model.input, image_model.layers[-2].output)  # Removing the last classification layer
+
+# Feature extraction function
+def extract_image_features(image_path, image_model):
+    image = Image.open(image_path)
+    image = image.resize((224, 224))  # Resize the image to match ResNet input size
+    image = np.array(image)
+    image = np.expand_dims(image, axis=0)
+    image = tf.keras.applications.resnet50.preprocess_input(image)
+    features = image_model.predict(image)
+    return features
+
+# A sample caption dataset (In practice, you would load a larger dataset)
+captions = {
+    "image1.jpg": "A dog is running on the grass",
+    "image2.jpg": "A man is playing soccer"
+}
+
+# Tokenize the captions
+tokenizer = Tokenizer()
+all_captions = [caption for caption in captions.values()]
+tokenizer.fit_on_texts(all_captions)
+
+# Prepare the input data for the LSTM model
+def create_sequences(image_features, caption, max_length, tokenizer, vocab_size):
+    seq = tokenizer.texts_to_sequences([caption])[0]
+    X_image, X_seq, y = [], [], []
+    
+    for i in range(1, len(seq)):
+        input_seq = seq[:i]
+        output_word = seq[i]
+        
+        input_seq = pad_sequences([input_seq], maxlen=max_length)[0]
+        
+        X_image.append(image_features)
+        X_seq.append(input_seq)
+        y.append(output_word)
+        
+    return np.array(X_image), np.array(X_seq), np.array(y)
+
+# Build the caption generation model
+def build_model(vocab_size, max_length):
+    inputs_image = Input(shape=(2048,))  # ResNet feature size
+    image_layer = Dense(256, activation='relu')(inputs_image)
+    
+    inputs_seq = Input(shape=(max_length,))
+    seq_layer = Embedding(vocab_size, 256, mask_zero=True)(inputs_seq)
+    seq_layer = LSTM(256)(seq_layer)
+    
+    decoder = tf.keras.layers.add([image_layer, seq_layer])
+    decoder = Dense(256, activation='relu')(decoder)
+    outputs = Dense(vocab_size, activation='softmax')(decoder)
+    
+    model = Model(inputs=[inputs_image, inputs_seq], outputs=outputs)
+    model.compile(loss='categorical_crossentropy', optimizer=Adam())
+    return model
+
+# Hyperparameters
+max_length = 10
+vocab_size = len(tokenizer.word_index) + 1
+
+# Build and summarize the model
+captioning_model = build_model(vocab_size, max_length)
+captioning_model.summary()
+
+# Example usage: training with one image-caption pair (for demonstration purposes)
+image_path = "path_to_your_image.jpg"  # replace with your image path
+image_features = extract_image_features(image_path, image_model)
+caption = captions["image1.jpg"]
+
+X_image, X_seq, y = create_sequences(image_features, caption, max_length, tokenizer, vocab_size)
+y = tf.keras.utils.to_categorical(y, num_classes=vocab_size)
+
+captioning_model.fit([X_image, X_seq], y, epochs=10)
+
+# Caption generation
+def generate_caption(image_features, tokenizer, max_length):
+    in_text = 'startseq'
+    for i in range(max_length):
+        seq = tokenizer.texts_to_sequences([in_text])[0]
+        seq = pad_sequences([seq], maxlen=max_length)
+        
+        yhat = captioning_model.predict([image_features, seq], verbose=0)
+        yhat = np.argmax(yhat)
+        word = tokenizer.index_word[yhat]
+        if word is None:
+            break
+        in_text += ' ' + word
+        if word == 'endseq':
+            break
+    
+    return in_text
+
+# Generate a caption for a new image
+new_image_path = "path_to_new_image.jpg"  # replace with your new image path
+new_image_features = extract_image_features(new_image_path, image_model)
+caption = generate_caption(new_image_features, tokenizer, max_length)
+print("Generated Caption:", caption)
