@@ -1,0 +1,41 @@
+# Simple Chatbot using if-else statements
+
+def chatbot_response(user_input):
+    user_input = user_input.lower()
+
+    # Greetings
+    if 'hello' in user_input or 'hi' in user_input:
+        return "Hello! How can I help you today?"
+    
+    # Asking about the chatbot
+    elif 'who are you' in user_input or 'what is your name' in user_input:
+        return "I am a simple chatbot here to assist you."
+
+    # Asking for help
+    elif 'help' in user_input:
+        return "Sure! I can assist you with general questions. What would you like to know?"
+
+    # Asking for weather (just a sample response)
+    elif 'weather' in user_input:
+        return "I can't provide live weather updates, but you can check your local forecast online."
+
+    # Asking for time (example response)
+    elif 'time' in user_input:
+        return "Sorry, I cannot provide the current time right now. Try checking your device's clock."
+
+    # Farewell
+    elif 'bye' in user_input or 'goodbye' in user_input:
+        return "Goodbye! Have a great day!"
+
+    # Default response for unknown queries
+    else:
+        return "I'm sorry, I don't understand that. Can you please ask something else?"
+
+# Example interaction
+while True:
+    user_input = input("You: ")
+    if user_input.lower() in ['exit', 'quit']:
+        print("Chatbot: Goodbye! Have a nice day!")
+        break
+    response = chatbot_response(user_input)
+    print(f"Chatbot: {response}")
