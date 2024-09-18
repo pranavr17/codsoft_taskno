@@ -73,3 +73,5 @@ print(f"Collaborative Filtering Recommendations for User {user_id}: {collab_reco
 # Content-based filtering recommendations
 content_recommendations = content_based_filtering(user_id, ratings, movies)
 print(f"Content-Based Filtering Recommendations for User {user_id}: {content_recommendations}")
+Collaborative Filtering Recommendations for User 1: ['Movie C', 'Movie D']
+Content-Based Filtering Recommendations for User 1: ['Movie C', 'Movie B', 'Movie D']
